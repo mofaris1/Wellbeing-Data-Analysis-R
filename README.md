@@ -16,7 +16,3 @@ This project presents a comprehensive statistical analysis of subjective well-be
 - **Language:** R
 - **Libraries:** `ggplot2`, `dplyr`, `tidyr`, `reshape2`, `RMarkdown`
 - **Reporting:** Statistical Analysis, Policy Recommendation Writing
-
-## Team
-- Yahia Abulibdeh
-- Mohammad Faris
