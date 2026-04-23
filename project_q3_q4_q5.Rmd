@@ -1,0 +1,637 @@
+---
+title: "project_q3_q4_q5"
+author: "Mohammad Faris"
+date: "2025-11-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+```
+
+```{r}
+df <- Nutrition_BMINDS_Food_Insecurity_Survey_and_stress_Responses_before_u_pdate
+```
+
+```{r}
+head(df)
+```
+
+```{r}
+colnames(df)
+```
+
+```{r}
+student_col <- "Are you currently enrolled in college?"
+gpa_col <- "What is your cumulative GPA range?"
+income_col <- "What is the total income of your primary household?"
+
+k10_cols <- c(
+  "In the last month, how often have you been upset because of something that happened unexpectedly?",
+  "In the last month, how often have you felt that you were unable to control the important things in your life?",
+  "In the last month, how often have you felt nervous and stressed?",
+  "In the last month, how often have you felt confident about your ability to handle your personal problems?",
+  "In the last month, how often have you felt that things were going your way?",
+  "In the last month, how often have you found that you could not cope with all the things that you had to do?",
+  "In the last month, how often have you been able to control irritations in your life?",
+  "In the last month, how often have you felt that you were on top of things?",
+  "In the last month, how often have you been angered because of things that happened that were outside of your control?",
+  "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?"
+)
+
+rs_cols <- c(
+  "1. I tend to bounce back quickly after hard times",
+  "2. I have a hard time making it through stressful events",
+  "3. It does not take me long to recover from a stressful event.",
+  "4. It is hard for me to snap back when something bad happens.",
+  "5. I usually come through difficult times with little trouble.",
+  "6. I tend to take a long time to get over set-backs in my life."
+)
+
+fies_cols <- c(
+  "During the last 12 months, was there a time when, because of lack of money or other resources you were worried you would not have enough food to eat?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources you were unable to eat healthy and nutritious food?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources you ate only a few kinds of foods?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources you had to skip a meal?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources you ate less than you thought you should?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources your household ran out of food?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources you were hungry but did not eat?",
+  "During the last 12 months, was there a time when, because of lack of money or other resources you went without eating for a whole day?"
+)
+
+food_cols <- c(
+  "On an average week, how many times do you consume whole grain products? (e.g., whole grain bread, whole grain cereal, brown rice or whole wheat pasta",
+  "On an average week, how many times do you consume dairy products?(e.g., milk, cheese, yogurt …etc.)",
+  "On an average week, how many times do you consume coffee or other sources of caffeine?(e.g., soda, tea, chocolate, energy drink …etc.)",
+  "On an average week, how many times do you consume fruits?",
+  "On an average week, how many times do you consume nuts, including flaxseed?",
+  "On an average week, how many times do you consume rice and/or pasta?",
+  "On an average week, how many times do you consume red meat, chicken, or turkey?",
+  "On an average week, how many times do you consume dark green leafy vegetables?(e.g., spinach, kale, lettuce …etc.)",
+  "On an average week, how many times do you consume beans?(e.g. black beans, black-eyed peas, lentils, lima beans, soy nuts …etc.)",
+  "On an average week, how many times do you consume fish and/or shellfish (including sardines and tuna)?",
+  "On an average week, how many times do you consume fast foods and/or pre-made or packaged food?",
+  "On average week, how many times do you take multivitamin supplements?",
+  "On average week, how many times do you take fish oil supplements?"
+)
+
+ 
+all_columns_to_keep <- c(student_col, gpa_col, income_col, k10_cols, rs_cols, fies_cols, food_cols)
+
+data <- df %>%
+  select(all_of(all_columns_to_keep))
+
+print(paste("Num of col in new data:", ncol(data)))
+glimpse(data)
+```
+
+```{r}
+# to calculate the mode
+get_mode <- function(v) {
+  uniqv <- unique(na.omit(v))
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+# select
+cols_to_fill <- c(student_col, gpa_col, income_col, k10_cols, rs_cols, fies_cols, food_cols)
+
+
+data <- data %>%
+  # Delete the NA record in Are you currently enrolled in college? (because it is just one record)
+  filter(!is.na(`Are you currently enrolled in college?`)) %>%
+  # fill it
+  mutate(across(all_of(cols_to_fill), ~ifelse(is.na(.), get_mode(.), .)))
+
+# Check
+sum(is.na(data[cols_to_fill]))
+```
+
+# Q3. Do university students feel better than people who are not studying?
+
+```{r}
+students <- data %>% filter(`Are you currently enrolled in college?` == "Yes")
+non_students <- data %>% filter(`Are you currently enrolled in college?` == "No")
+```
+
+```{r}
+head(students)
+head(non_students)
+```
+
+```{r}
+unique_k10_values <- lapply(data[k10_cols], unique)
+unique_k10_values
+```
+
+```{r}
+data[k10_cols] <- lapply(data[k10_cols], function(x) {
+  x <- tolower(x)
+  x <- trimws(x)
+  return(x)
+})
+```
+
+```{r}
+lapply(data[k10_cols], unique)
+```
+
+```{r}
+mapping <- c(
+  "never" = 1,
+  "almost never" = 2,
+  "sometimes" = 3,
+  "fairly often" = 4,
+  "very often" = 5
+)
+
+data[k10_cols] <- lapply(data[k10_cols], function(x) {
+  as.numeric(mapping[x])
+})
+```
+
+```{r}
+summary(data[k10_cols])
+```
+
+```{r}
+colSums(is.na(data[k10_cols]))
+```
+
+```{r}
+data$K10_total <- rowSums(data[k10_cols])
+```
+
+```{r}
+summary(data$K10_total)
+```
+
+```{r}
+colSums(is.na(data[rs_cols]))
+```
+
+```{r}
+negative_rs_cols <- c(
+  "2. I have a hard time making it through stressful events",
+  "4. It is hard for me to snap back when something bad happens.",
+  "6. I tend to take a long time to get over set-backs in my life."
+)
+
+# reverse coding
+data[negative_rs_cols] <- 6 - data[negative_rs_cols]
+```
+
+```{r}
+data$RS_total <- rowSums(data[rs_cols])
+```
+
+```{r}
+summary(data$RS_total)
+```
+
+```{r}
+summary_stats <- data %>%
+  group_by(`Are you currently enrolled in college?`) %>%
+  summarise(
+    Avg_K10_Distress = mean(K10_total, na.rm = TRUE),
+    Avg_Resilience = mean(RS_total, na.rm = TRUE),
+    Count = n()
+  )
+
+print(summary_stats)
+```
+
+```{r}
+summary_stats <- data %>%
+  group_by(`Are you currently enrolled in college?`) %>%
+  summarise(
+    Avg_K10_Distress = mean(K10_total, na.rm = TRUE),
+    Avg_Resilience = mean(RS_total, na.rm = TRUE),
+    Count = n()
+  )
+
+print(summary_stats)
+```
+
+```{r}
+ggplot(
+  data %>% 
+    dplyr::filter(!is.na(`Are you currently enrolled in college?`)),
+  aes(x = K10_total)
+) +
+  geom_histogram(binwidth = 2, fill = "skyblue", color = "black") +
+  facet_wrap(~`Are you currently enrolled in college?`) +
+  labs(
+    title = "Histogram of K10 Scores", 
+    subtitle = "Checking distribution shape for Students vs Non-Students"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(
+  data %>% 
+    dplyr::filter(!is.na(`Are you currently enrolled in college?`)),
+  aes(x = RS_total)
+) +
+  geom_histogram(binwidth = 2, fill = "skyblue", color = "black") +
+  facet_wrap(~`Are you currently enrolled in college?`) +
+  labs(
+    title = "Histogram of RS Scores", 
+    subtitle = "Checking distribution shape for Students vs Non-Students"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(
+  data %>% 
+    dplyr::filter(!is.na(`Are you currently enrolled in college?`)),
+  aes(sample = K10_total)
+) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  facet_wrap(~`Are you currently enrolled in college?`) +
+  labs(title = "Q-Q Plot for K10 Scores") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(
+  data %>% 
+    dplyr::filter(!is.na(`Are you currently enrolled in college?`)),
+  aes(sample = RS_total)
+) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  facet_wrap(~`Are you currently enrolled in college?`) +
+  labs(title = "Q-Q Plot for RS Scores") +
+  theme_minimal()
+```
+
+```{r}
+shapiro.test(data$K10_total[data$`Are you currently enrolled in college?` == "Yes"])
+```
+
+```{r}
+shapiro.test(data$RS_total[data$`Are you currently enrolled in college?` == "Yes"])
+```
+
+```{r}
+wilcox.test(K10_total ~ `Are you currently enrolled in college?`, data = data)
+```
+
+```{r}
+wilcox.test(RS_total ~ `Are you currently enrolled in college?`, data = data)
+```
+
+```{r}
+ggplot(
+  data %>% 
+    dplyr::filter(!is.na(`Are you currently enrolled in college?`)),
+  aes(
+    x = `Are you currently enrolled in college?`,
+    y = K10_total,
+    fill = `Are you currently enrolled in college?`
+  )
+) +
+  geom_boxplot() +
+  labs(
+    title = "Comparison of Mental Distress (K10) Scores",
+    subtitle = "Students vs. Non-Students (Lower score means feeling better)",
+    x = "Enrolled in College?",
+    y = "K10 Distress Score"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(values = c("Yes" = "#69b3a2", "No" = "#404080"))
+
+```
+
+# Q4. What is the connection between having enough food and students’ GPA?
+
+```{r}
+summary(data$`What is your cumulative GPA range?`)
+```
+
+```{r}
+head(data$`What is your cumulative GPA range?`)
+```
+
+```{r}
+gpa_col <- "What is your cumulative GPA range?"
+```
+
+```{r}
+unique_gpa_values <- lapply(data[gpa_col], unique)
+unique_gpa_values
+```
+
+```{r}
+data$GPA_factor <- factor(data$`What is your cumulative GPA range?`,
+                          levels = c("Less than 1","1.0-1.49","1.5-1.99",
+                                     "2.0-2.29","2.3-2.69","2.7-2.99",
+                                     "3.0-3.39","3.4-3.69","3.7-4.0"),
+                          ordered = TRUE)
+
+```
+
+```{r}
+table(data$GPA_factor, useNA = "ifany")
+```
+
+```{r}
+unique_fies_values <- lapply(data[fies_cols], unique)
+unique_fies_values
+```
+
+```{r}
+# 
+data[fies_cols] <- lapply(data[fies_cols], function(x) {
+  x <- tolower(x)
+  x <- trimws(x)
+  return(x)
+})
+```
+
+```{r}
+lapply(data[fies_cols], unique)
+```
+
+```{r}
+mapping <- c(
+  "no" = 0,
+  "not sure or don't know" = 0.5,
+  "yes" = 1
+)
+
+data[fies_cols] <- lapply(data[fies_cols], function(x) {
+  as.numeric(mapping[x])
+})
+```
+
+```{r}
+summary(data[fies_cols])
+```
+
+```{r}
+colSums(is.na(data[fies_cols]))
+```
+
+```{r}
+data$FIES_total <- rowSums(data[fies_cols])
+```
+
+```{r}
+summary(data$FIES_total)
+```
+
+```{r}
+students_data <- data %>%
+  filter(`Are you currently enrolled in college?` == "Yes" & !is.na(GPA_factor))
+```
+
+```{r}
+students_data$GPA_factor <- factor(students_data$GPA_factor, 
+                                   levels = c("Less than 1",
+                                              "1.0-1.49",
+                                              "1.5-1.99",
+                                              "2.0-2.29",
+                                              "2.3-2.69",
+                                              "2.7-2.99",
+                                              "3.0-3.39",
+                                              "3.4-3.69",
+                                              "3.7-4.0"),
+                                   ordered = TRUE)
+```
+
+```{r}
+shapiro.test(students_data$FIES_total)
+```
+
+```{r}
+lm_model <- lm(FIES_total ~ GPA_factor, data = students_data)
+
+summary(lm_model)
+```
+
+```{r}
+students_data %>%
+  group_by(GPA_factor) %>%
+  summarise(
+    Avg_Food_Insecurity = mean(FIES_total, na.rm = TRUE),
+    Student_Count = n()
+  )
+```
+
+```{r}
+students_summary <- students_data %>%
+  group_by(GPA_factor) %>%
+  summarise(
+    Mean_FIES = mean(FIES_total, na.rm = TRUE),
+    SE = sd(FIES_total, na.rm = TRUE) / sqrt(n()) 
+  )
+
+
+ggplot(students_summary, aes(x = GPA_factor, y = Mean_FIES)) +
+  geom_col(fill = "#d95f02", alpha = 0.8, width = 0.7) +  
+  labs(title = "Higher Grades Associated with Lower Food Insecurity",
+       subtitle = "Average FIES Score by GPA (Shorter bar is better)",
+       x = "Cumulative GPA",
+       y = "Average Food Insecurity Score") +
+  theme_minimal() +
+  coord_flip() +   
+  theme(axis.text.y = element_text(size = 10)) 
+
+```
+
+```{r}
+new_labels <- c(
+  "Less than 1" = "<1",
+  "1.0-1.49"    = "1.2",
+  "1.5-1.99"    = "1.8",
+  "2.0-2.29"    = "2.1",
+  "2.3-2.69"    = "2.4",
+  "2.7-2.99"    = "2.8",
+  "3.0-3.39"    = "3.2",
+  "3.4-3.69"    = "3.5",
+  "3.7-4.0"     = "3.9"
+)
+
+ggplot(students_data, aes(x = GPA_factor, y = FIES_total)) +
+  # Boxplot
+  geom_boxplot(fill = "lightblue", alpha = 0.7, outlier.shape = NA) +
+  
+  scale_x_discrete(labels = new_labels) +
+  
+  labs(title = "Relationship: GPA vs. Food Insecurity",
+       subtitle = "Higher GPA is associated with lower food insecurity",
+       x = "Cumulative GPA",
+       y = "Food Insecurity Score (FIES)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(face = "bold")) +
+  coord_flip() 
+```
+
+# Q5.How does family income affect the kind of food people eat?
+
+```{r}
+unique_income_values <- lapply(data[income_col], unique)
+unique_income_values
+```
+
+```{r}
+data$income_factor <- factor(data$`What is the total income of your primary household?`,
+                          levels = c("Less than $10,000",
+                                     "$10,000 to $19,999", 
+                                     "$20,000 to $29,999",
+                                     "$30,000 to $39,999",
+                                     "$40,000 to $49,999",
+                                     "$50,000 to $59,999",
+                                     "$60,000 to $69,999",
+                                     "$70,000 to $79,999",
+                                     "$80,000 to $89,999",
+                                     "$90,000 to $99,999",
+                                     "$100,000 to $149,999",
+                                     "$150,000 to $249,999",
+                                     "$250,000 or more"),
+                          ordered = TRUE)
+```
+
+```{r}
+unique_food_values <- lapply(data[food_cols], unique)
+unique_food_values
+```
+
+```{r}
+data[food_cols] <- lapply(data[food_cols], function(x) {
+  x <- tolower(x)
+  x <- trimws(x)
+  return(x)
+})
+```
+
+```{r}
+lapply(data[food_cols], unique)
+```
+
+```{r}
+mapping <- c(
+  "never" = 0,
+  "1 time" = 1,
+  "2 times" = 2,
+  "3 times" = 3,
+  "4 times" = 4,
+  "5 times or more" = 5
+)
+
+data[food_cols] <- lapply(data[food_cols], function(x) {
+  as.numeric(mapping[x])
+})
+```
+
+```{r}
+summary(data[food_cols])
+```
+
+```{r}
+colSums(is.na(data[food_cols]))
+```
+
+```{r}
+healthy_items <- c(
+  "On an average week, how many times do you consume fruits?",
+  "On an average week, how many times do you consume dark green leafy vegetables?(e.g., spinach, kale, lettuce …etc.)",
+  "On an average week, how many times do you consume whole grain products? (e.g., whole grain bread, whole grain cereal, brown rice or whole wheat pasta",
+  "On an average week, how many times do you consume dairy products?(e.g., milk, cheese, yogurt …etc.)",
+  "On an average week, how many times do you consume beans?(e.g. black beans, black-eyed peas, lentils, lima beans, soy nuts …etc.)",
+  "On an average week, how many times do you consume fish and/or shellfish (including sardines and tuna)?"
+)
+
+unhealthy_items <- c(
+  "On an average week, how many times do you consume fast foods and/or pre-made or packaged food?",
+  "On an average week, how many times do you consume coffee or other sources of caffeine?(e.g., soda, tea, chocolate, energy drink …etc.)"
+)
+```
+
+```{r}  
+data$Healthy_Score <- rowSums(data[, healthy_items], na.rm = TRUE)
+data$Unhealthy_Score <- rowSums(data[, unhealthy_items], na.rm = TRUE)
+```
+
+```{r}
+summary(data$Healthy_Score)
+```
+
+```{r}
+summary(data$Unhealthy_Score)
+```
+
+```{r}
+shapiro.test(data$Healthy_Score)
+
+shapiro.test(data$Unhealthy_Score)
+```
+
+```{r}
+lm_healthy_income <- lm(Healthy_Score ~ income_factor, data = data)
+summary(lm_healthy_income)
+
+lm_unhealthy_income <- lm(Unhealthy_Score ~ income_factor, data = data)
+summary(lm_unhealthy_income)
+```
+
+```{r}
+# Healthy plot
+p1 <- ggplot(data, aes(x = income_factor, y = Healthy_Score, group = 1)) +
+  stat_summary(fun = mean, geom = "point", size = 3, color = "darkgreen") +
+  stat_summary(fun = mean, geom = "line", size = 1, color = "darkgreen") +
+  geom_smooth(method = "lm", color = "red", linetype = "dashed", se = FALSE) + # trend line
+  labs(title = "Income vs. Healthy Eating", 
+       subtitle = "Significant Positive Trend",
+       y = "Avg. Healthy Score", x = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())    
+
+# Unhealthy plot
+p2 <- ggplot(data, aes(x = income_factor, y = Unhealthy_Score, group = 1)) +
+  stat_summary(fun = mean, geom = "point", size = 3, color = "orange") +
+  stat_summary(fun = mean, geom = "line", size = 1, color = "orange") +
+  geom_smooth(method = "lm", color = "red", linetype = "dashed", se = FALSE) +
+  labs(title = "Income vs. Unhealthy Eating", 
+       subtitle = "No Significant Linear Trend",
+       y = "Avg. Unhealthy Score", x = "Household Income") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(face = "bold")) +
+  scale_x_discrete(
+    labels = c(
+      "Less than $10,000"        = "5k",
+      "$10,000 to $19,999"       = "15k",
+      "$20,000 to $29,999"       = "25k",
+      "$30,000 to $39,999"       = "35k",
+      "$40,000 to $49,999"       = "45k",
+      "$50,000 to $59,999"       = "55k",
+      "$60,000 to $69,999"       = "65k",
+      "$70,000 to $79,999"       = "75k",
+      "$80,000 to $89,999"       = "85k",
+      "$90,000 to $99,999"       = "95k",
+      "$100,000 to $149,999"     = "125k",
+      "$150,000 to $249,999"     = "200k",
+      "$250,000 or more"         = "250k"
+    )
+  )
+
+# show over each others
+p1 / p2
+```

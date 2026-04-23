@@ -1,0 +1,808 @@
+---
+title: "Data Visualization"
+author: "yahia abulibdeh"
+date: "2025-11-26"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+```{r, include=FALSE}
+options(tinytex.verbose = TRUE)
+```
+
+```{r Q1.Do people with different levels of physical activity differ in their resilience (BRS) and stress mindset (SMM) scores?}
+
+library(ggplot2)
+library(writexl)
+library(readxl)
+library(reshape2)
+library(dplyr)
+library(corrplot)
+
+# Read the data and make exploratory and preprocessing
+
+df <- read_excel(file.choose())
+                                                                              
+
+df <- df[!is.na(df$`Are you currently enrolled in college?`), ]
+
+
+
+# Question _1_resilience_StressMindset_PhysicalActivity
+q1_rs_stmd_ac <- df[, c("1. I tend to bounce back quickly after hard times",
+                  "2. I have a hard time making it through stressful events",
+                  "3. It does not take me long to recover from a stressful event.",
+                  "4. It is hard for me to snap back when something bad happens.",
+                  "5. I usually come through difficult times with little trouble.",
+                  "6. I tend to take a long time to get over set-backs in my life.",
+                  "The effects of stress are negative and should be avoided.",
+                  "Experiencing stress facilitates my learning and growth.",
+                  "Experiencing stress depletes my health and vitality.",
+                  "Experiencing stress enhances my performance and productivity.",
+                  "Experiencing stress inhibits my learning and growth.",
+                  "Experiencing stress improves my health and vitality.",
+                  "Experiencing stress debilitates my performance and productivity.",
+                  "The effects of stress are positive and should be utilized.",
+                  "How many times per week, on average, do you engage in physical activity for at least 20 minutes a day?")]
+
+
+# Find missing values
+
+cat("The missing values in the columns:")
+
+colSums(is.na(q1_rs_stmd_ac))
+
+
+# Preprocessing ...
+
+# Take the numraic columns and fill the nan values with mean
+
+numaric_col <- sapply(q1_rs_stmd_ac, is.numeric)
+
+q1_rs_stmd_ac[numaric_col] <- lapply(q1_rs_stmd_ac[numaric_col], function(x){
+  x[is.na(x)] <-median(x, na.rm = TRUE)
+  x <- as.integer(round(x))
+  return(x)
+})
+
+# Reverse the columns that are reverse scored which they are the 2, 4, 6 columns in resilience   columns
+
+cols_to_reverse <- c(
+  "2. I have a hard time making it through stressful events",
+  "4. It is hard for me to snap back when something bad happens.",
+  "6. I tend to take a long time to get over set-backs in my life."
+)
+
+q1_rs_stmd_ac[cols_to_reverse] <- lapply(q1_rs_stmd_ac[cols_to_reverse], function(x) {
+  if (is.numeric(x)) {
+    return(ifelse(x == 1, 5,
+           ifelse(x == 2, 4,
+           ifelse(x == 3, 3,
+           ifelse(x == 4, 2,
+           ifelse(x == 5, 1, x))))))
+  } else {
+    warning("Non-numeric column detected and skipped: ", deparse(substitute(x)))
+    return(x)
+  }
+})
+
+# Make function for pre process to process the nan values in categorical columns
+
+get_mode <- function(x){
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# Process the nan values
+
+catigorical_col <- sapply(q1_rs_stmd_ac, is.character)
+
+q1_rs_stmd_ac[catigorical_col] <- lapply(q1_rs_stmd_ac[catigorical_col], function(x){
+  x[is.na(x)] <- get_mode(x)
+  return(x)
+})
+
+
+# Turn the categorical columns to numeric to interpret the result in stress mindset columns
+
+q1_rs_stmd_ac$`The effects of stress are negative and should be avoided.` <-
+  recode(q1_rs_stmd_ac$`The effects of stress are negative and should be avoided.`,
+         "Strongly Disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor Disagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+
+q1_rs_stmd_ac$`Experiencing stress facilitates my learning and growth.` <-
+  recode(q1_rs_stmd_ac$`Experiencing stress facilitates my learning and growth.`,
+         "Strongly disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor Disagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+q1_rs_stmd_ac$`Experiencing stress depletes my health and vitality.` <-
+  recode(q1_rs_stmd_ac$`Experiencing stress depletes my health and vitality.`,
+         "Strongly disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+q1_rs_stmd_ac$`Experiencing stress enhances my performance and productivity.` <-
+  recode(q1_rs_stmd_ac$`Experiencing stress enhances my performance and productivity.`,
+         "Strongly disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+q1_rs_stmd_ac$`Experiencing stress inhibits my learning and growth.` <-
+  recode(q1_rs_stmd_ac$`Experiencing stress inhibits my learning and growth.`,
+         "Strongly disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+q1_rs_stmd_ac$`Experiencing stress improves my health and vitality.` <-
+  recode(q1_rs_stmd_ac$`Experiencing stress improves my health and vitality.`,
+         "Strongly disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+q1_rs_stmd_ac$`Experiencing stress debilitates my performance and productivity.` <-
+  recode(q1_rs_stmd_ac$`Experiencing stress debilitates my performance and productivity.`,
+         "Strongly disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+q1_rs_stmd_ac$`The effects of stress are positive and should be utilized.` <-
+  recode(q1_rs_stmd_ac$`The effects of stress are positive and should be utilized.`,
+         "Strongly Disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor Disagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+# Create a new column to interpret the resilience score (BRS_Score)
+
+rs_columns <- c(
+  "1. I tend to bounce back quickly after hard times",
+  "2. I have a hard time making it through stressful events",
+  "3. It does not take me long to recover from a stressful event.",
+  "4. It is hard for me to snap back when something bad happens.",
+  "5. I usually come through difficult times with little trouble.",
+  "6. I tend to take a long time to get over set-backs in my life."
+)
+
+q1_rs_stmd_ac$BRS_Score <- rowSums(q1_rs_stmd_ac[rs_columns], na.rm = TRUE)
+
+
+# Create a new column to categorise the BRS_Score
+
+q1_rs_stmd_ac <- q1_rs_stmd_ac %>%
+  mutate(BRS_Score_Interpretation = case_when(
+    BRS_Score >= 6  & BRS_Score <= 13 ~ "Low resilience",
+    BRS_Score >= 14 & BRS_Score <= 21 ~ "Normal resilience",
+    BRS_Score >= 22 & BRS_Score <= 30 ~ "High resilience",
+    TRUE ~ NA_character_
+  ))
+
+ 
+# Create a new column to interpret the stress mindset score
+
+stmd_columns <- c("The effects of stress are negative and should be avoided.",
+                  "Experiencing stress facilitates my learning and growth.",
+                  "Experiencing stress depletes my health and vitality.",
+                  "Experiencing stress enhances my performance and productivity.",
+                  "Experiencing stress inhibits my learning and growth.",
+                  "Experiencing stress improves my health and vitality.",
+                  "Experiencing stress debilitates my performance and productivity.",
+                  "The effects of stress are positive and should be utilized.")
+
+
+# Create a new column to interpret the stress Mindset score (SMM) 
+
+q1_rs_stmd_ac$SMM <- rowSums(q1_rs_stmd_ac[stmd_columns], na.rm = TRUE)
+
+
+# Create a new column to categorise the SMM
+
+
+q1_rs_stmd_ac <- q1_rs_stmd_ac %>%
+  mutate(SMM_Interpretation = case_when(
+    SMM >= 0  & SMM <= 10 ~ "Stress-is-Debilitating Mindset",
+    SMM >= 11 & SMM <= 21 ~ "Neutral/Mixed Mindset",
+    SMM >= 22 & SMM <= 32 ~ "Stress-is-Enhancing Mindset",
+    TRUE ~ NA_character_
+  ))
+
+
+
+cat("The missing values in the columns after pre process:")
+
+colSums(is.na(q1_rs_stmd_ac))
+
+q1_rs_stmd_ac <- q1_rs_stmd_ac %>%
+  rename(Physical_Activity = `How many times per week, on average, do you engage in physical activity for at least 20 minutes a day?`)
+
+activity_levels <- c(
+  "None" = 0,
+  "1 time" = 1,
+  "2 times" = 2,
+  "3 times" = 3,
+  "4 times" = 4,
+  "5 times" = 5,
+  "6-7 times" = 6
+)
+
+
+
+q1_rs_stmd_ac$activity_ordinal <- activity_levels[q1_rs_stmd_ac$`Physical_Activity`]
+
+```
+
+
+```{r Q1.~visualisations}
+
+q1_rs_stmd_ac$Physical_Activity <- factor(q1_rs_stmd_ac$Physical_Activity,
+                           levels = c("None", "1 time", "2 times", "3 times", "4 times", "5 times", "6-7 times"))
+
+plot1 <- ggplot(q1_rs_stmd_ac, aes(x = BRS_Score, y = SMM)) +
+  geom_point(aes(color = BRS_Score_Interpretation), size = 2.5, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1.2, color = "darkblue", fill = "lightblue", alpha = 0.3) +
+  facet_wrap(~ Physical_Activity, ncol = 3) +
+  scale_color_manual(values = c("Low resilience" = "#e74c3c", "Normal resilience" = "#f39c12", "High resilience" = "#27ae60")) +
+  labs(
+    title = "Relationship Between Resilience and Stress Mindset",
+    subtitle = "Stratified by Weekly Physical Activity Frequency",
+    x = "Brief Resilience Scale (BRS) Score (Higher = More Resilient)",
+    y = "Stress Mindset Measure (SMM) Score (Higher = More Stressful Mindset)",
+    color = "Resilience Level"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray40"),
+    strip.text = element_text(face = "bold", size = 10),
+    strip.background = element_rect(fill = "gray90", color = "gray80"),
+    panel.spacing = unit(1, "lines"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  )
+
+plot1
+
+ggsave("Fig1_Resilience_Stress_by_Activity.png", plot = plot1, width = 12, height = 8, dpi = 300, bg = "white")
+
+plot2 <- ggplot(q1_rs_stmd_ac, aes(x = BRS_Score, y = SMM)) +
+  geom_point(aes(color = BRS_Score_Interpretation, size = SMM), alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE, color = "darkred", fill = "pink") +
+  scale_color_manual(values = c("Low resilience" = "#e74c3c", "Normal resilience" = "#f39c12", "High resilience" = "#27ae60")) +
+  scale_size_continuous(range = c(1, 4)) +
+  labs(
+    title = "Resilience vs Stress Mindset Relationship",
+    subtitle = "Bubble size represents stress mindset intensity",
+    x = "Resilience Score (BRS)",
+    y = "Stress Mindset Score (SMM)",
+    color = "Resilience Level",
+    size = "Stress Level"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, color = "gray40")
+  )
+
+plot2
+
+ggsave("Fig2_Resilience_Stress_Bubble.png", plot = plot2, width = 10, height = 7, dpi = 300, bg = "white")
+
+q1_rs_stmd_ac$Physical_Activity<- factor(q1_rs_stmd_ac$Physical_Activity,
+                         levels = c("None", "1 time", "2 times", "3 times", "4 times", "5 times", "6-7 times"))
+
+plot3 <- ggplot(q1_rs_stmd_ac, aes(x = Physical_Activity, y = SMM, fill = Physical_Activity)) +
+  geom_boxplot(
+    alpha = 0.8,
+    color = "gray30",
+    linewidth = 0.5,
+    outlier.shape = 21,
+    outlier.fill = "#e74c3c",
+    outlier.color = "gray30",
+    outlier.size = 2
+  ) +
+  stat_summary(
+    fun = median,
+    geom = "point",
+    shape = 21,
+    size = 3,
+    fill = "white",
+    color = "gray30"
+  ) +
+  scale_fill_viridis_d(option = "plasma", alpha = 0.7) +
+  labs(
+    title = "Stress Mindset Scores Across Physical Activity Levels",
+    subtitle = "Higher SMM scores indicate more stressful mindset",
+    x = "Weekly Physical Activity Frequency",
+    y = "Stress Mindset Score (SMM)",
+    caption = "Median values shown with white dots"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5, margin = margin(b = 10)),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray40", margin = margin(b = 15)),
+    plot.caption = element_text(size = 9, color = "gray50", margin = margin(t = 10)),
+    axis.text.x = element_text(hjust = 1, size = 10),
+    axis.title = element_text(face = "bold"),
+    legend.position = "none",
+    panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  ) +
+  scale_y_continuous(breaks = seq(0, 32, by = 4))
+
+plot3
+
+ggsave("Fig3_SMM_by_Activity_Boxplot.png", plot = plot3, width = 10, height = 7, dpi = 300, bg = "white")
+
+
+plot4 <- ggplot(q1_rs_stmd_ac, aes(x = activity_ordinal, y = SMM)) +
+  geom_jitter(
+    aes(color = SMM),
+    width = 0.15,
+    height = 0,
+    size = 3,
+    alpha = 0.6,
+    shape = 16
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = TRUE,
+    color = "#2c3e50",
+    fill = "#3498db",
+    alpha = 0.2,
+    linewidth = 1.2
+  ) +
+  scale_color_gradient2(
+    low = "#2ecc71",
+    mid = "#f1c40f",
+    high = "#e74c3c",
+    midpoint = 16,
+    name = "SMM Score"
+  ) +
+  labs(
+    title = "Relationship Between Physical Activity and Stress Mindset",
+    subtitle = "Linear trend shows the association between activity frequency and perceived stress",
+    x = "Physical Activity Frequency (Ordinal Scale: 0-6)",
+    y = "Stress Mindset Score (SMM)",
+    caption = paste("Spearman correlation:", round(cor(q1_rs_stmd_ac$activity_ordinal, q1_rs_stmd_ac$SMM, method = "spearman", use = "complete.obs"), 3))
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray40", margin = margin(b = 15)),
+    plot.caption = element_text(size = 10, color = "gray50", margin = margin(t = 10)),
+    axis.title = element_text(face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray92", linewidth = 0.4),
+    panel.grid.minor = element_line(color = "gray96", linewidth = 0.2),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  ) +
+  scale_x_continuous(breaks = 0:6, labels = c("None", "1 time", "2 times", "3 times", "4 times", "5 times", "6-7 times"))
+
+plot4
+
+ggsave("Fig4_Activity_vs_SMM_Jitter.png", plot = plot4, width = 10, height = 7, dpi = 300, bg = "white")
+
+plot5 <- ggplot(q1_rs_stmd_ac, aes(x = activity_ordinal, y = BRS_Score)) +
+  geom_jitter(
+    aes(color = BRS_Score_Interpretation),
+    width = 0.15,
+    height = 0,
+    size = 3.5,
+    alpha = 0.7,
+    shape = 19
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = TRUE,
+    color = "#27ae60",
+    fill = "#2ecc71",
+    alpha = 0.2,
+    linewidth = 1.2
+  ) +
+  scale_color_manual(values = c("Low resilience" = "#e74c3c", "Normal resilience" = "#f39c12", "High resilience" = "#27ae60")) +
+  labs(
+    title = "Relationship Between Physical Activity and Resilience",
+    subtitle = "Positive trend suggests physical activity may enhance psychological resilience",
+    x = "Physical Activity Frequency",
+    y = "Resilience Score (BRS)",
+    color = "Resilience Level",
+    caption = paste("Spearman correlation:", round(cor(q1_rs_stmd_ac$activity_ordinal, q1_rs_stmd_ac$BRS_Score, method = "spearman", use = "complete.obs"), 3))
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5, margin = margin(b = 10)),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray40", margin = margin(b = 15)),
+    plot.caption = element_text(size = 10, color = "gray50", margin = margin(t = 10)),
+    axis.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 11),
+    legend.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray92", linewidth = 0.4),
+    panel.grid.minor = element_line(color = "gray96", linewidth = 0.2),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  ) +
+  scale_x_continuous(breaks = 0:6, labels = c("None", "1 time", "2 times", "3 times", "4 times", "5 times", "6-7 times"), limits = c(-0.5, 6.5)) +
+  scale_y_continuous(breaks = seq(6, 30, by = 4))
+
+plot5
+
+ggsave("Fig5_Activity_vs_Resilience_Jitter.png", plot = plot5, width = 10, height = 7, dpi = 300, bg = "white")
+
+df_corr <- q1_rs_stmd_ac[, c("SMM", "BRS_Score")]
+corr_matrix <- cor(df_corr, method = "spearman", use = "complete.obs")
+
+corrplot(corr_matrix, 
+         method = "color",
+         type = "upper",
+         order = "hclust",
+         tl.col = "black",
+         tl.srt = 45,
+         col = colorRampPalette(c("#e74c3c", "#ecf0f1", "#3498db"))(100),
+         addCoef.col = "white",
+         number.cex = 1,
+         tl.cex = 0.9,
+         cl.lim = c(-1, 1),
+         title = "Correlation Matrix: Stress Mindset and Resilience",
+         mar = c(0, 0, 2, 0),
+         cl.offset = 0.5)
+
+plot_record <- recordPlot()
+
+png("Fig6_correlation_matrix.png", width = 1000, height = 800, res = 150)
+replayPlot(plot_record)
+dev.off()
+```
+
+
+
+
+```{r Q1.~Aplly the tests}
+
+# Check the normality
+shapiro.test(q1_rs_stmd_ac$SMM)
+
+lm_q1_smm <- lm(SMM ~ Physical_Activity, data = q1_rs_stmd_ac)
+summary(lm_q1_smm)
+
+lm_q1_rs <- lm(BRS_Score ~ Physical_Activity, data = q1_rs_stmd_ac)
+summary(lm_q1_rs)
+
+cor.test(q1_rs_stmd_ac$SMM, q1_rs_stmd_ac$BRS_Score, method = "spearman")
+```
+
+
+
+
+```{r Q2.Does the strees mindest affected by gender?}
+
+# Select the columns to answer the question
+
+q2_stmd <- df[, c("What is your gender?",
+                  "The effects of stress are negative and should be avoided.",
+                  "Experiencing stress facilitates my learning and growth.",
+                  "Experiencing stress depletes my health and vitality.",
+                  "Experiencing stress enhances my performance and productivity.",
+                  "Experiencing stress inhibits my learning and growth.",
+                  "Experiencing stress improves my health and vitality.",
+                  "Experiencing stress debilitates my performance and productivity.",
+                  "The effects of stress are positive and should be utilized.")]
+
+cat("The missing values in the columns:")
+
+colSums(is.na(q2_stmd))
+
+
+# Fill nan values
+
+catigorical_col <- sapply(q2_stmd, is.character)
+q2_stmd[catigorical_col] <- lapply(q2_stmd[catigorical_col], function(x){
+  x[is.na(x)] <- get_mode(x)
+  return(x)
+})
+
+ 
+# Turn the categorical columns to numeric to interpret the result 
+
+q2_stmd$`The effects of stress are negative and should be avoided.` <-
+  recode(q2_stmd$`The effects of stress are negative and should be avoided.`,
+         "Strongly Disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor Disagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+
+q2_stmd$`Experiencing stress facilitates my learning and growth.` <-
+  recode(q2_stmd$`Experiencing stress facilitates my learning and growth.`,
+         "Strongly disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor Disagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+q2_stmd$`Experiencing stress depletes my health and vitality.` <-
+  recode(q2_stmd$`Experiencing stress depletes my health and vitality.`,
+         "Strongly disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+q2_stmd$`Experiencing stress enhances my performance and productivity.` <-
+  recode(q2_stmd$`Experiencing stress enhances my performance and productivity.`,
+         "Strongly disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+q2_stmd$`Experiencing stress inhibits my learning and growth.` <-
+  recode(q2_stmd$`Experiencing stress inhibits my learning and growth.`,
+         "Strongly disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+q2_stmd$`Experiencing stress improves my health and vitality.` <-
+  recode(q2_stmd$`Experiencing stress improves my health and vitality.`,
+         "Strongly disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+q2_stmd$`Experiencing stress debilitates my performance and productivity.` <-
+  recode(q2_stmd$`Experiencing stress debilitates my performance and productivity.`,
+         "Strongly disagree" = 4,
+         "Disagree" = 3,
+         "Neither Agree nor DIsagree" = 2,
+         "Agree" = 1,
+         "Strongly Agree" = 0)
+
+q2_stmd$`The effects of stress are positive and should be utilized.` <-
+  recode(q2_stmd$`The effects of stress are positive and should be utilized.`,
+         "Strongly Disagree" = 0,
+         "Disagree" = 1,
+         "Neither Agree nor Disagree" = 2,
+         "Agree" = 3,
+         "Strongly Agree" = 4)
+
+
+# Create a new column to interpret the stress Mindset score (SMM) 
+
+
+q2_stmd$SMM <- rowSums(q2_stmd[sapply(q2_stmd, is.numeric)])
+
+
+# Create a new column to categorise the SMM
+
+q2_stmd <- q2_stmd %>%
+  mutate(SMM_Interpretation = case_when(
+    SMM >= 0  & SMM <= 10 ~ "Stress-is-Debilitating Mindset",
+    SMM >= 11 & SMM <= 21 ~ "Neutral/Mixed Mindset",
+    SMM >= 22 & SMM <= 32 ~ "Stress-is-Enhancing Mindset",
+    TRUE ~ NA_character_
+  ))
+
+# Check the data after pre process
+
+cat("The missing values in the columns after pre process:")
+
+colSums(is.na(q2_stmd))
+
+```
+
+
+```{r Q2.~visualisations}
+
+q2_stmd_p1<- ggplot(q2_stmd, aes(x = SMM, fill = `What is your gender?`)) +
+  geom_density(alpha = 0.6) +
+  labs(title = "SMM Density by Gender in Each Interpretation Category") +
+  theme_minimal(base_size = 14)
+
+q2_stmd_p1
+ggsave("q2_stmd_p1.png", q2_stmd_p1, 
+       width = 9, height = 7, dpi = 300, bg = "white")
+
+q2_stmd_p2 <- ggplot(q2_stmd, aes(x = SMM, fill = `What is your gender?`)) +
+  geom_density(alpha = 0.7, color = NA) +
+  geom_vline(xintercept = c(10.5, 21.5), linetype = "dashed", color = "gray40", linewidth = 0.5) +
+  facet_wrap(~ `What is your gender?`, ncol = 2) +
+  scale_fill_manual(values = c("Male" = "#2E86AB", "Female" = "#A23B72")) +
+  labs(title = "Stress Mindset Distribution by Gender",
+       subtitle = "Dashed lines show mindset boundaries: Debilitating (0-10), Neutral (11-21), Enhancing (22-32)",
+       x = "Stress Mindset Measure (SMM) Score", 
+       y = "Density",
+       fill = "Gender") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray40", margin = margin(b = 15)),
+    strip.text = element_text(face = "bold", size = 12),
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(1.5, "lines")
+  ) +
+  scale_x_continuous(breaks = seq(0, 32, by = 5))
+
+
+q2_stmd_p2
+
+ggsave("q2_stmd_p2.png", q2_stmd_p2, 
+       width = 10, height = 7, dpi = 300, bg = "white") 
+
+
+q2_stmd_p3 <- ggplot(q2_stmd) +
+  geom_boxplot(aes(y = SMM, x = `What is your gender?`, fill = `What is your gender?`), color= "black") +
+  scale_fill_manual(values = c(
+    "Male" = "#2E86AB",
+    "Female" = "pink"
+  ))+
+  labs(
+    x = "Gender",
+    y = "SMM",
+    title = "SMM scores by gender"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(hjust = 1)
+  )
+ggsave("q2_stmd_p3.png", q2_stmd_p3, 
+       width = 9, height = 7, dpi = 300, bg = "white")
+
+q2_stmd_p3
+
+# Create a factor with levels ordered by median SMM score in descending order
+q2_stmd <- q2_stmd %>%
+  mutate(SMM_Interpretation = factor(
+    SMM_Interpretation,
+    levels = c(
+      "Stress-is-Enhancing Mindset",
+      "Neutral/Mixed Mindset", 
+      "Stress-is-Debilitating Mindset"
+    )
+  ))
+
+q2_stmd_p4 <- ggplot(q2_stmd) +
+  geom_boxplot(aes(y = SMM, x = `What is your gender?`, fill = SMM_Interpretation), 
+               color = "black", alpha = 0.8) +
+  scale_fill_manual(values = c("Stress-is-Debilitating Mindset" = "#2ecc71", 
+                              "Neutral/Mixed Mindset" = "#f39c12", 
+                              "Stress-is-Enhancing Mindset" = "#e74c3c")) +
+  labs(
+    x = "Gender",
+    y = "Stress Mindset Measure (SMM) Score",
+    title = "Stress Mindset Scores by Gender and Stress Level",
+    subtitle = "Colored by stress interpretation categories (ordered descending by mindset)",
+    fill = "Stress Level"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray40"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 11),
+    legend.position = "bottom"
+  )
+
+q2_stmd_p4
+
+ggsave("q2_stmd_p4.png", q2_stmd_p4, 
+       width = 9, height = 7, dpi = 300, bg = "white")
+
+
+```
+
+```{r Apply the test}
+
+# Check normality
+shapiro.test(q2_stmd$SMM)
+
+wilcox.test(SMM ~ `What is your gender?`, data = q2_stmd)
+
+# save the data as Excel
+write.csv(q2_stmd, "q2_gender_stress_data.csv", row.names = FALSE)
+```
+
+
+```{r}
+
+new_df <- q1_rs_stmd_ac
+
+new_df$Gender <- q2_stmd$`What is your gender?`
+
+write.csv(
+  new_df,
+  "clean_dataset_for_q1_q2.csv",
+  row.names = FALSE
+)
+
+```
+
+
+
+
+```{r}
+
+
+smm_stats <- q2_stmd %>%
+  summarise(
+    Variable = "Stress Mindset (SMM)",
+    Mean = round(mean(SMM, na.rm = TRUE), 2),
+    SD = round(sd(SMM, na.rm = TRUE), 2),
+    Median = median(SMM, na.rm = TRUE),
+    Min = min(SMM, na.rm = TRUE),
+    Max = max(SMM, na.rm = TRUE),
+    n = n()
+  )
+
+brs_stats <- q1_rs_stmd_ac %>%
+  summarise(
+    Variable = "Resilience (BRS)",
+    Mean = round(mean(BRS_Score, na.rm = TRUE), 2),
+    SD = round(sd(BRS_Score, na.rm = TRUE), 2),
+    Median = median(BRS_Score, na.rm = TRUE),
+    Min = min(BRS_Score, na.rm = TRUE),
+    Max = max(BRS_Score, na.rm = TRUE),
+    n = n()
+  )
+
+
+desc_stats <- bind_rows(smm_stats, brs_stats)
+print(desc_stats)
+
+resilience_freq <- q1_rs_stmd_ac %>%
+  count(BRS_Score_Interpretation) %>%
+  mutate(Percentage = round(n/sum(n)*100, 1))
+
+stress_freq <- q2_stmd %>%
+  count(SMM_Interpretation) %>%
+  mutate(Percentage = round(n/sum(n)*100, 1))
+
+gender_freq <- q2_stmd %>%
+  count(`What is your gender?`) %>%
+  mutate(Percentage = round(n/sum(n)*100, 1))
+
+print(resilience_freq)
+print(stress_freq)
+print(gender_freq)
+
+activity_freq <- q1_rs_stmd_ac %>%
+  count(Physical_Activity) %>%
+  mutate(Percentage = round(n/sum(n)*100, 1)) %>%
+  arrange(desc(n))
+
+print(activity_freq)
+```
